@@ -1,18 +1,19 @@
 #' Simulated study data.
 #'
 #' This is the code to create the study data - a simulated dataset that can be
-#' used to demonstrate how to use the codebook package.
+#' used to demonstrate how to use the `tabler` package.
 #'
-#' @format A data frame with 20 rows and 9 variables:
+#' @format A data frame with 100 rows and 10 variables:
 #' \describe{
 #'   \item{id}{Participant's study identification number}
+#'   \item{age}{Participant's age in years at the time of enrollment}
+#'   \item{age_group}{Participant's age at the time of enrollment categorized as "Younger than 30" or "30 and Older"}
 #'   \item{sex}{Biological sex of the participant assigned at birth, female/male}
-#'   \item{date}{Participant's date of enrollment}
-#'   \item{time}{Participant's time of enrollment}
-#'   \item{date_time}{Participant's date and time of enrollment}
-#'   \item{days}{Total number of days the participant was enrolled in the study}
-#'   \item{height}{Participant's height in inches at date of enrollment}
-#'   \item{likert}{An example Likert scale item, 1-5}
-#'   \item{outcome}{Participant experienced the outcome of interest, TRUE or FALSE}
+#'   \item{height_in}{Participant's height in inches at date of enrollment}
+#'   \item{wt_lbs}{Participant's weight in pounds at date of enrollment}
+#'   \item{bmi}{Participant's bmi at date of enrollment}
+#'   \item{bmi_4cat}{Participant's bmi at date of enrollment categorized as "Underweight", "Normal", "Overweight", or "Obese"}
+#'   \item{exposure}{Participant was exposed to a hypothetical risk factor of interest, Yes/No}
+#'   \item{outcome}{Participant experienced a hypothetical outcome of interest, Yes/No}
 #' }
 "study"
