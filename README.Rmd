@@ -13,7 +13,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-# tabler
+# tabler <img style="padding: 15px;" align="left" src="man/figures/tabler_hex/tabler_hex_transparent.png" alt="tabler hex logo" width="250" height="289">
 
 <!-- badges: start -->
 <!-- [![CRAN status](https://www.r-pkg.org/badges/version/tabler)](https://cran.r-project.org/package=tabler) -->
