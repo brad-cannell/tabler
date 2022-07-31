@@ -1,0 +1,610 @@
+---
+title: "MOTIVATE Table 1"
+date: "2022-07-07"
+---
+
+# Overview
+
+Code for Motivate Table 1. There is just some code in here that I think might be useful for tabler. Delete this file when you are done with development.
+
+This is a process for a table one with multiple grouping variables. In this case, overall and the two levels of exposure (in Motivate it was intervention group). 
+
+# Load packages
+
+```{r}
+library(dplyr, warn.conflicts = FALSE)
+library(purrr)
+library(tidyr)
+library(readr)
+library(freqtables)
+library(meantables)
+library(flextable)
+library(officer)
+library(stringr)
+devtools::load_all()
+```
+
+
+# Load data
+
+```{r}
+data(study)
+```
+
+# Define variable list
+
+these lists should be consistent for the overall table and the by group table. 
+
+```{r}
+# Continuous variables we want to investigate
+cont_vars <- c("age", "ht_in", "wt_lbs", "bmi")
+```
+
+```{r}
+# Categorical variables we want to investigate
+cat_vars <- c("age_group", "sex", "bmi_4cat", "outcome")
+```
+
+```{r}
+# The data frame we want to use
+df <- study
+```
+
+
+# Table 1 overall
+
+Start by creating Table 1 overall (i.e., not by group). Then, create a by group table 1. The final step will be to bind them together into a single Table 1 and format it.
+
+## One categorical variable overall
+
+Categorical variables are a little bit trickier than continuous variables because of the formatting we have to do to them for Word tables. 
+
+1. Calculate the stats
+2. Collapse var name and categories into a single character sting so that they all fit in one cell in the Word table
+
+For testing
+
+```{r}
+# 1. Calculate the stats
+test_cat <- df %>%
+  # Remove rows with missing values
+  filter(!is.na(sex)) %>%
+  # Calculations
+  freq_table(sex) %>%
+  # Format statistics
+  freq_format("n (percent%)", digits = 0) %>%
+  # Keep columns of interest
+  select(var, cat, formatted_stats) %>%
+  # Add spaces in front of category labels
+  mutate(cat = paste0("  ", cat)) %>%
+  # Slide category labels under row variable label
+  add_row(cat = "sex", .before = 1) %>%
+  select(-var, var = cat)
+
+test_cat
+```
+
+
+```{r}
+# 3. Collapse var name and categories into a single character sting so that they all fit in one cell in the Word table
+# I think this should probably be a separate function.
+test_cat <- test_cat %>%
+mutate(
+  across(
+    everything(),
+    function(x) {
+      # Paste row header and category labels together with line breaks
+      x <- paste(x, collapse = "\n")
+      # Remove leading NA
+      x <- stringr::str_remove(x, "^NA")
+    }
+  )
+) %>%
+# Now all rows of the data frame are identical.
+# Just keep the first row.
+slice(1)
+
+test_cat
+```
+
+### Function cat overall
+
+To do the steps above iteratively, we will need to 
+
+```{r}
+cat_stats_overall_fn <- function(.data, .pred, stat_recipe = NULL, .digits = 0) {
+  .data %>% 
+    # Remove rows with missing values
+    filter(!is.na({{ .pred }})) %>% 
+    # Calculations
+    freq_table({{ .pred }}) %>%  
+    # Format statistics
+    freq_format(stat_recipe, digits = .digits) %>% 
+    # Keep columns of interest
+    select(var, cat, formatted_stats) %>% 
+    # Add spaces in front of category labels
+    mutate(cat = paste0("  ", cat)) %>%
+    # Slide category labels under row variable label
+    add_row(cat = !!quo_name(enquo(.pred)), .before = 1) %>%
+    select(-var, var = cat) %>% 
+    # Paste all categories into one row
+    mutate(
+      across(
+        everything(),
+        function(x) {
+          x <- paste(x, collapse = "\n")
+          # Remove leading NA
+          x <- stringr::str_remove(x, "^NA")
+          x
+        }
+      )
+    ) %>%
+    slice(1)
+}
+
+# Test
+# cat_stats_overall_fn(df, sex, stat_recipe = "n (percent%)")
+```
+
+### Loop over all categorical variables
+
+```{r}
+cat_overall <- map_df(
+  .x = cat_vars,
+  .f = ~ cat_stats_overall_fn(df, !! sym(.x), stat_recipe = "n (percent%)")
+)
+```
+
+## One continuous variable overall
+
+For testing
+
+```{r}
+test_cont <- df %>%
+  # Remove rows with missing values
+  filter(!is.na(age)) %>%
+  # Calculations
+  mean_table(age) %>%
+  # Format statistics
+  freq_format("mean (sd)", digits = 2) %>%
+  # Keep columns of interest
+  select(var = response_var, formatted_stats)
+
+test_cont
+```
+
+### Function cont overall
+
+```{r}
+cont_stats_overall_fn <- function(.data, .pred, stat_recipe = NULL, .digits = 2) {
+  .data %>% 
+    # Remove rows with missing values
+    filter(!is.na({{ .pred }})) %>% 
+    # Calculations
+    mean_table({{ .pred }}) %>%  
+    # Format statistics
+    mean_format(stat_recipe, digits = .digits) %>% 
+    # Keep columns of interest
+    select(var = response_var, formatted_stats)
+}
+
+# Test
+# cont_stats_overall_fn(df, age, stat_recipe = "mean (sd)")
+```
+
+### Loop over all continuous variables
+
+```{r}
+cont_overall <- map_df(
+  .x = cont_vars,
+  .f = ~ cont_stats_overall_fn(df, !! sym(.x), stat_recipe = "mean (sd)")
+)
+```
+
+## Bind cat and cont overall
+
+```{r}
+overall <- bind_rows(
+  cat_overall,
+  cont_overall
+)
+```
+
+
+# Table 1 by group
+
+```{r}
+table(df$exposure)
+```
+
+
+## One categorical variable by group
+
+For testing
+
+```{r}
+df %>%
+  # Remove rows with missing values
+  filter(!is.na(sex)) %>%
+  # Calculations
+  freq_table(exposure, sex) %>%
+  # Format statistics
+  freq_format("n (percent%)", digits = 0) %>%
+  # Keep columns of interest
+  select(row_var:col_cat, formatted_stats) %>%
+  # Display by row_cat
+  pivot_wider(
+    names_from = "row_cat",
+    values_from = "formatted_stats"
+  ) %>%
+  # Add spaces in front of category labels
+  mutate(col_cat = paste0("  ", col_cat)) %>%
+  # Slide category labels under row variable label
+  add_row(col_cat = "sex", .before = 1) %>%
+  select(-row_var, -col_var, var = col_cat) %>%
+  # Paste all categories into one row
+  mutate(
+    across(
+      everything(),
+      function(x) {
+        x <- paste(x, collapse = "\n")
+        # Remove leading NA
+        x <- stringr::str_remove(x, "^NA")
+        x
+      }
+    )
+  ) %>%
+  slice(1)
+```
+
+### Function cat by group
+
+```{r}
+# I don't think I like "outcome" and "pred" here. I will probably come back and change these later.
+# What do I like better? row_var and col_var?
+cat_stats_group_fn <- function(.data, .outcome, .pred, stat_recipe = NULL, .digits = 0) {
+  .data %>% 
+    # Remove rows with missing values
+    filter(!is.na({{ .pred }})) %>% 
+    # Calculations
+    freq_table({{ .outcome }}, {{ .pred }}) %>%  
+    # Format statistics
+    freq_format(stat_recipe, digits = .digits) %>%
+    # Keep columns of interest
+    select(row_var:col_cat, formatted_stats) %>% 
+    # Display by row_cat
+    pivot_wider(
+      names_from = "row_cat",
+      values_from = "formatted_stats"
+    ) %>% 
+    # Add spaces in front of category labels
+    mutate(col_cat = paste0("  ", col_cat)) %>% 
+    # Slide category labels under row variable label
+    add_row(col_cat = !!quo_name(enquo(.pred)), .before = 1) %>% 
+    select(-row_var, -col_var, var = col_cat) %>% 
+    # Paste all categories into one row
+    mutate(
+      across(
+        everything(),
+        function(x) {
+          x <- paste(x, collapse = "\n")
+          # Remove leading NA
+          x <- stringr::str_remove(x, "^NA")
+          x
+        }
+      )
+    ) %>%
+    slice(1)
+}
+
+# Test
+# cat_stats_group_fn(df, exposure, sex, stat_recipe = "n (percent%)")
+```
+
+### Loop over all categorical variables
+
+```{r}
+cat_by_group <- map_df(
+  .x = cat_vars,
+  .f = ~ cat_stats_group_fn(df, exposure, !! sym(.x), stat_recipe = "n (percent_row%)")
+)
+```
+
+## One continuous variable by group
+
+For testing
+
+```{r}
+df %>%
+  # Remove rows with missing values
+  filter(!is.na(age)) %>%
+  group_by(exposure) %>%
+  # Calculations
+  mean_table(age) %>%
+  # Format statistics
+  mean_format("mean (sd)", digits = 2) %>%
+  # Keep columns of interest
+  select(var = response_var, group_cat, formatted_stats) %>%
+  # Display by row_cat
+  pivot_wider(
+    names_from = "group_cat",
+    values_from = "formatted_stats"
+  )
+```
+
+### Function cont by group
+
+```{r}
+cont_stats_group_fn <- function(.data, .group, .pred, stat_recipe = NULL, .digits = 2) {
+  .data %>% 
+    # Remove rows with missing values
+    filter(!is.na({{ .pred }})) %>%
+    group_by({{ .group }}) %>%
+    # Calculations
+    mean_table({{ .pred }}) %>%  
+    # Format statistics
+    mean_format(stat_recipe, digits = .digits) %>% 
+    # Keep columns of interest
+    select(var = response_var, group_cat, formatted_stats) %>%
+    # Display by row_cat
+    pivot_wider(
+      names_from = "group_cat",
+      values_from = "formatted_stats"
+    )
+}
+
+# Test
+# cont_stats_group_fn(df, exposure, age, stat_recipe = "mean (sd)")
+```
+
+### Loop over all continuous variables
+
+```{r}
+cont_by_group <- map_df(
+  .x = cont_vars,
+  .f = ~ cont_stats_group_fn(df, exposure, !! sym(.x), stat_recipe = "mean (sd)")
+)
+```
+
+## Bind cat and cont by group
+
+```{r}
+by_group <- bind_rows(
+  cat_by_group,
+  cont_by_group
+)
+```
+
+
+# Join overall and by group
+
+Sometimes You have to col_bind. Joining gets weird with blank rows and creates duplicate rows.
+
+```{r}
+table_01 <- left_join(overall, by_group, by = "var")
+```
+
+# Make flextable
+
+This doesn't seem to work on the VA computer. I had to email it to myself. Actually, it works if you print it to desktop. Then you can move it into another folder. 
+
+```{r}
+table_01_ft <- flextable(table_01)
+```
+
+## Format flextable
+
+```{r}
+table_01_ft <- table_01_ft %>%
+  # Change column widths. figure out through trial and error
+  width(width = c(2.62, 1.23, 1.23, 1.23)) %>%
+  # Center text in all but the first column
+  align(j = -1, align = "center", part = "all") %>%
+  # Change header names -- add subgroup n's to headers
+  set_header_labels(
+    var = "Characteristic",
+    formatted_stats = "Overall\n(n=50)",
+    Control = "Control\n(n=24)",
+    Motivate = "Motivate\n(n=26)"
+  ) %>%
+  # Bold column headers
+  bold(part = "header")
+```
+
+### Improve row headers
+
+Categorical variables are a little bit trickier than continuous variables because of the formatting we have to do to them for Word tables. Above, we already collapsed var name and categories into a single character sting separated by line breaks so that they all fit in one cell in the Word table.
+
+This is great because it's the final format we want and because it makes it easy to create visual separation between rows.
+
+However, it makes it more difficult to format the variable names as row headers. For example, race_eth_4_cat = Race and ethnicity, n (%). Previously we would format the row headers directly in the flextable. I really like that approach becuase I like doing data stuff with dplyr and formatting stuff with flextable. I like keeping them separate and "race_eth_4cat" is much easier to work with than "Race and ethnicity, n (%)" if we decide we need to do more data manipulation. 
+
+But because we've collapsed the var name and the category levels into a single cell of the table (which is a good thing overall), the flextable code we used to use won't work (e.g., `compose(i = ~ var == "sex", j = 1, as_paragraph("Sex, n (%)"`).
+
+Options:
+
+1. Use regular expression code inside of `compose()` to just change the var name into a row header.
+  * Pros: Works. Keeps data manipulation and formatting separate.
+  * Cons: The regular expression code may not be easy to translate into more general functions/workflows (e.g., `tabler`). 
+
+2. Use regular expressions to change var name to row header in combined data frame prior to coercing to a flextable. 
+  * Pros: Works. Requires fewer loops than option 1.
+  * Cons: The regular expression code may not be easy to translate into more general functions/workflows (e.g., `tabler`). Requires multiple functions and steps and doesn't keep data manipulation and formatting separated.
+
+3. Transform var names to row headers in the code above where we create stats tables. 
+  * Pros: Works. 
+  * Cons: Requires multiple functions and steps and doesn't keep data manipulation and formatting separated.
+  
+#### Create a data frame of header transformations
+
+Trying to automate as much as possible
+
+```{r}
+# Get all of the variable names and add to a data frame
+names_to_headers <- tibble(
+  string = table_01$var,
+  var_name = str_extract(string, "^\\w*"),
+  type = if_else(var_name %in% cat_vars, "cat", "cont"),
+  # We could maybe event grab these somewhere else if we save recipe
+  # For now, just typing in manually
+  stat = if_else(type == "cat", "n(%)", "mean (sd)")
+)
+```
+
+```{r}
+# Wrap all of this in a function
+case_when_vars <- paste0('var_name == ', '"', names_to_headers$var_name, '"', ' ~ "",')
+case_when_vars <- paste(case_when_vars, collapse = "\n    ")
+case_when_vars <-str_remove(case_when_vars, ",$")
+```
+
+```{r}
+# The user needs to tell us what the row header text should say
+# Print some code that will help us make sure we don't miss any vars
+# names_to_headers$var_name
+cat(
+paste0("names_to_headers <- names_to_headers %>%\n  mutate(header = case_when(\n    ", case_when_vars, "\n  ))")
+)
+```
+
+```{r}
+# A function for updating without starting over could be useful too.
+names_to_headers <- names_to_headers %>%
+  mutate(header = case_when(
+    var_name == "age_group" ~ "Age group",
+    var_name == "sex" ~ "Sex",
+    var_name == "bmi_4cat" ~ "Body Mass Index Category",
+    var_name == "outcome" ~ "Outcome",
+    var_name == "age" ~ "Age",
+    var_name == "ht_in" ~ "Height",
+    var_name == "wt_lbs" ~ "Weight",
+    var_name == "bmi" ~ "Body Mass Index"
+  ))
+```
+
+```{r}
+# Add the stats to the row headers
+names_to_headers <- names_to_headers %>%
+  mutate(header = paste0(header, ", ", stat))
+```
+
+```{r}
+# For testing
+# str_replace(
+#   names_to_headers$string,
+#   names_to_headers$var_name,
+#   names_to_headers$header
+# )
+```
+
+```{r}
+# Single variable. Save for testing for now
+# i <- 4
+# table_01_ft <- table_01_ft %>%
+#   compose(
+#     i = ~ stringr::str_detect(var, names_to_headers$var_name[[i]]),
+#     j = 1,
+#     as_paragraph(str_replace(
+#       names_to_headers$string[[i]],
+#       names_to_headers$var_name[[i]],
+#       names_to_headers$header[[i]]
+#     ))
+#   )
+
+# For testing - why is marital changing to married?
+# i <- 3
+# str_replace(
+#   names_to_headers$string[[i]],
+#   names_to_headers$var_name[[i]],
+#   names_to_headers$header[[i]]
+# )
+
+# stringr::str_detect(table_01$var, names_to_headers$var_name[[i]])
+# Marital returns true for marital only
+# Married returns true for marital and married?
+# Why
+# Because "Married" is the first category of marital
+# stringr::str_detect(table_01$var, "^married")
+# stringr::str_detect(table_01$var, paste0("^", names_to_headers$var_name[[i]]))
+# Adding a carrot to the front fixes the problem
+```
+
+```{r}
+# Add carrot to the front of var_name so that the row header is only replaced
+# when the string is found in the variable name as opposed to anywhere in string
+names_to_headers$var_name <- paste0("^", names_to_headers$var_name)
+```
+
+```{r}
+# Loop over all variables
+for (i in 1:nrow(names_to_headers)) {
+  table_01_ft <- table_01_ft %>%
+    compose(
+      i = ~ stringr::str_detect(var, names_to_headers$var_name[[i]]), 
+      j = 1, 
+      as_paragraph(str_replace(
+        names_to_headers$string[[i]], 
+        names_to_headers$var_name[[i]], 
+        names_to_headers$header[[i]]
+      ))
+    )
+}
+```
+
+### Finish flextable formatting
+
+```{r}
+table_01_ft <- table_01_ft %>%
+  # Use padding for row separation
+  padding(padding.top = 0, padding.bottom = 10, part = "body") %>%
+  # Change font to TNR 11
+  font(fontname = "Times New Roman", part = "all") %>%
+  fontsize(part = "all", size = 11)
+```
+
+## Add flextable to Word document
+
+```{r}
+doc <- read_docx() %>% 
+  body_add_flextable(table_01_ft)
+```
+
+```{r}
+print(doc, "table_01.docx")
+```
+
+
+# Alternative for row headers
+
+```{r}
+# table_01 <- left_join(overall, by_group, by = "var")
+```
+
+```{r}
+# table_01$var <- str_replace(
+#   names_to_headers$string,
+#   names_to_headers$var_name,
+#   names_to_headers$header
+# )
+```
+
+And then do the flextable formatting. This doesn't exactly maintain the clean break between data manipulation and formatting, but it does seem like a more straightforward solution with fewer loops. 
+
+
+2022-07-24: Working on plane to DC. Got the code above working with study data instead of Motivate data. 
+  * Still need to do more work on renaming row variables. For example bmi and bmi_4cat
+  * Need to start encapsolating in functions
+  * Need to think about if I want to reconfigure freq_tables first. 
+  * Lots of errors in devtools::check(). Need to fix them when I have internet again. 
+
+
+
+
+
+
+
+
+
+
+
+

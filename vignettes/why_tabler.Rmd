@@ -23,7 +23,7 @@ library(flextable)
 library(freqtables)
 library(meantables)
 library(officer)
-# library(tabler)
+library(tabler)
 
 # Load the study data that is packaged with tabler
 data(study)
@@ -121,8 +121,8 @@ This first example is perhaps the most common type of table we will create -- a 
 
 Let's start by looking at a complete example:
 
-```{r random-pic-from-url, echo=FALSE}
-knitr::include_graphics("../img/example_table_1.png")
+```{r example_table_1, echo=FALSE}
+knitr::include_graphics("../man/figures/table_01.png")
 ```
 
 Here is the minimum code needed to achieve the result in the screenshot above. Below, we will break this code down step-by-step.
@@ -253,7 +253,7 @@ doc <- read_docx("../template_descriptive_analysis.docx") %>%
 ```{r}
 print(
   doc,
-  "../Example Table 1.docx"
+  "../example_table_01.docx"
 )
 ```
 
@@ -685,7 +685,7 @@ doc <- read_docx("../template_descriptive_analysis.docx") %>%
 ```{r}
 print(
   doc,
-  "../Example Table 1.docx"
+  "../example_table_01.docx"
 )
 ```
 

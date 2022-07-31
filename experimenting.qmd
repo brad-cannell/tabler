@@ -1,0 +1,13 @@
+---
+title: "Experimenting"
+---
+
+I'm just trying to get a feel for how I want tabler to work. Very preliminary stuff. This document will be erased before doing a build check.
+
+Basic skeleton for tabler
+* Don’t worry about compatibility with freq tables and mean tables. Just think I’m terms of base R and summarize
+
+Documentation
+* Experimenting: Just for you. wrap your head around where this is going.
+* Why tabler: What would you do without the tabler package?
+* README: Overview of how to use tabler.
